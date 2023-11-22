@@ -1,0 +1,374 @@
+---
+title: "BACS HW9"
+author: '108071037'
+date: "2022/04/15"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Q1**
+
+**a. Let’s explore to see if any sticker bundles seem intuitively similar:**
+```{r}
+#install.packages('data.table')
+library(data.table)
+ac_bundles_dt <- fread("piccollage_accounts_bundles.csv")
+ac_bundles_matrix <- as.matrix(ac_bundles_dt[, -1, with=FALSE])
+
+```
+
+**i) How many recommendations does each bundle have? **
+
+6 recommendations
+
+**ii) Find a single sticker bundle that is both in our limited data set and also in the app’s Sticker Store . Then, use your intuition to recommend five other bundles in our dataset that might have similar usage patterns as this bundle.**
+
+I choose 'sweetmothersday'
+
+#recommendations guesses
+
+'Mom2013'
+'toMomwithLove'
+'supersweet'
+'lovestinks2016'
+'happybday'
+
+by searching on key words related to mom, love, sweet and happy.
+
+
+**b. Let’s find similar bundles using geometric models of similarity:**
+
+**i) Let’s create cosine similarity based recommendations for all bundles:**
+
+**1. Create a matrix or data.frame of the top 5 recommendations for all bundles**
+
+```{r}
+#install.packages('lsa')
+library(lsa)
+bundles_cos <- round(cosine(ac_bundles_matrix),2)
+originname <- colnames(bundles_cos)
+
+func <- function(a){
+  order(bundles_cos[,a], decreasing = TRUE)
+  order <- bundles_cos[order(bundles_cos[,a], decreasing = TRUE),]
+  rec5 <- row.names(order)[2:6]
+  return(rec5)
+}
+
+for (i in 1:165){
+  if (i == 1){
+    x <- func(i)
+    newdata <- matrix(x,nrow = 5)
+  }else{
+    x <- func(i)
+    newdata <- cbind(newdata,x) 
+  }
+}
+colnames(newdata) <- originname
+as.data.frame(newdata[,1:10]) #Since printing out the whole data takes too much space, I only printed out the first 10 columns, and so are the questions below
+
+```
+
+**2. Create a new function that automates the above functionality: it should take an accounts-bundles matrix as a parameter, and return a data object with the top 5 recommendations for each bundle in our data set, using cosine similarity.**
+```{r}
+library(lsa)
+bundles_cos <- round(cosine(ac_bundles_matrix),2)
+
+func <- function(a){
+  order(bundles_cos[,a], decreasing = TRUE)
+  order <- bundles_cos[order(bundles_cos[,a], decreasing = TRUE),]
+  rec5 <- row.names(order)[2:6]
+  return(rec5)
+}
+for (i in 1:165){
+  if (i == 1){
+    x <- func(i)
+    newdata <- matrix(x,nrow = 5)
+  }else{
+    x <- func(i)
+    newdata <- cbind(newdata,x) 
+  }
+}
+colnames(newdata) <- originname
+as.data.frame(newdata[,1:5])
+
+```
+
+**3. What are the top 5 recommendations for the bundle you chose to explore earlier?**
+```{r}
+num <- which(colnames(newdata) == "sweetmothersday")
+newdata[,num]
+
+```
+
+**ii) Let’s create correlation based recommendations.**
+
+**1. Reuse the function you created above **
+```{r}
+library(lsa)
+bundle_means <- apply(ac_bundles_matrix, 2, mean)
+bundle_means_matrix<-t(replicate(nrow(ac_bundles_matrix),bundle_means))
+ac_bundles_mc_b<-ac_bundles_matrix-bundle_means_matrix
+cor_sim<-cosine(ac_bundles_mc_b)
+originname <- colnames(bundles_cos)
+
+func_cor <- function(a){
+  order(cor_sim[,a], decreasing = TRUE)
+  order_cor <- cor_sim[order(cor_sim[,a], decreasing = TRUE),]
+  rec5_cor <- row.names(order_cor)[2:6]
+  return(rec5_cor)
+}
+for (i in 1:165){
+  if (i == 1){
+    x_cor <- func_cor(i)
+    newdata_cor <- matrix(x_cor,nrow = 5)
+  }else{
+    x_cor <- func_cor(i)
+    newdata_cor <- cbind(newdata_cor,x_cor) 
+  }
+}
+colnames(newdata_cor) <- originname
+as.data.frame(newdata_cor[,1:10])
+
+```
+
+**2. give the function an accounts-bundles matrix where each bundle (column) has already been mean-centered in advance. **
+```{r}
+library(lsa)
+bundle_means <- apply(ac_bundles_matrix, 2, mean)
+bundle_means_matrix<-t(replicate(nrow(ac_bundles_matrix),bundle_means))
+ac_bundles_mc_b<-ac_bundles_matrix-bundle_means_matrix
+cor_sim<-cosine(ac_bundles_mc_b)
+
+func_cor <- function(a){
+  order(cor_sim[,a], decreasing = TRUE)
+  order_cor <- cor_sim[order(cor_sim[,a], decreasing = TRUE),]
+  rec5_cor <- row.names(order_cor)[2:6]
+  return(rec5_cor)
+}
+for (i in 1:165){
+  if (i == 1){
+    x_cor <- func_cor(i)
+    newdata_cor <- matrix(x_cor,nrow = 5)
+  }else{
+    x_cor <- func_cor(i)
+    newdata_cor <- cbind(newdata_cor,x_cor) 
+  }
+}
+colnames(newdata_cor) <- originname
+as.data.frame(newdata_cor[,1:5])
+```
+
+**3. Now what are the top 5 recommendations for the bundle you chose to explore earlier?**
+```{r}
+num_cor <- which(colnames(newdata_cor) == "sweetmothersday")
+func_cor(num)
+```
+
+**iii)Let’s create adjusted-cosine based recommendations.**
+
+**1.Reuse the function you created above**
+```{r}
+library(lsa)
+bundle_means_adj <- apply(ac_bundles_matrix, 1, mean)
+bundle_means_adj_matrix<-replicate(ncol(ac_bundles_matrix),bundle_means_adj)
+ac_bundles_mc<-ac_bundles_matrix-bundle_means_adj_matrix
+cos_adj<-cosine(ac_bundles_mc)
+originname <- colnames(bundles_cos)
+
+func_adj <- function(a){
+  order(cos_adj[,a], decreasing = TRUE)
+  order_adj <- cos_adj[order(cos_adj[,a], decreasing = TRUE),]
+  rec5_adj <- row.names(order_adj)[2:6]
+  return(rec5_adj)
+}
+for (i in 1:165){
+  if (i == 1){
+    x_adj <- func_adj(i)
+    newdata_adj <- matrix(x_adj,nrow = 5)
+  }else{
+    x_adj <- func_adj(i)
+    newdata_adj <- cbind(newdata_adj,x_adj) 
+  }
+}
+colnames(newdata_adj) <- originname
+as.data.frame(newdata_adj[,1:10])
+
+```
+
+
+**2. give the function an accounts-bundles matrix where each 
+account (row) has already been mean-centered in advance.**
+```{r}
+library(lsa)
+bundle_means_adj <- apply(ac_bundles_matrix, 1, mean)
+bundle_means_adj_matrix<-replicate(ncol(ac_bundles_matrix),bundle_means_adj)
+ac_bundles_mc<-ac_bundles_matrix-bundle_means_adj_matrix
+cos_adj<-cosine(ac_bundles_mc)
+originname <- colnames(bundles_cos)
+
+func_adj <- function(a){
+  order(cos_adj[,a], decreasing = TRUE)
+  order_adj <- cos_adj[order(cos_adj[,a], decreasing = TRUE),]
+  rec5_adj <- row.names(order_adj)[2:6]
+  return(rec5_adj)
+}
+for (i in 1:165){
+  if (i == 1){
+    x_adj <- func_adj(i)
+    newdata_adj <- matrix(x_adj,nrow = 5)
+  }else{
+    x_adj <- func_adj(i)
+    newdata_adj <- cbind(newdata_adj,x_adj) 
+  }
+}
+colnames(newdata_adj) <- originname
+as.data.frame(newdata_adj[,1:5])
+```
+
+**3. What are the top 5 recommendations for the bundle you chose to explore earlier?**
+
+```{r}
+num_adj <- which(colnames(newdata_adj) == "sweetmothersday")
+func_adj(num)
+```
+
+**c. Are the three sets of geometric recommendations similar in nature (theme/keywords) to the recommendations you picked earlier using your intuition alone? What reasons might explain why your computational geometric recommendation models produce different results from your intuition?**
+
+The results using geometric recommendation methods are not the same as my guesses, because we can only "guess" the results instead of calculating all the relations and compare between them.
+
+**d. What do you think is the conceptual difference in cosine similarity, correlation, and adjusted-cosine?**
+
+Correlation and adjusted-cosine uses the mean-centered cosine. The difference is that correlation uses the column mean while adjusted-cosine uses the row mean.
+
+
+## **Q2**
+
+**a. Create a horizontal set of random points, with a relatively narrow but flat distribution.**
+
+**i) What raw slope of x and y would you generally expect?**
+
+We expect the slope close be to 0.
+
+**ii) What is the correlation of x and y that you would generally expect?**
+
+We expect the correlation be close to 0.
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_a.png")
+```
+
+**b. Create a completely random set of points to fill the entire plotting area, along both x-axis and y-axis**
+
+**i) What raw slope of x and y would you generally expect?**
+
+We expect the slope close be to 0.
+
+**ii) What is the correlation of x and y that you would generally expect?**
+
+We expect the correlation be close to 0.
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_b.png")
+```
+
+**c. Create a diagonal set of random points trending upwards at 45 degrees**
+
+**i) What raw slope of x and y would you generally expect? (note that x, y have the same scale)**
+
+We expect the slope close be to 1.
+
+**ii) What is the correlation of x and y that you would generally expect?**
+
+If x and y are linear, we can expect the correlation be close to 1.
+
+If x and y are nonlinear, we can expect the correlation be close to 0.
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_c.png")
+```
+
+**d. Create a diagonal set of random trending downwards at 45 degrees**
+
+**i) What raw slope of x and y would you generally expect? (note that x, y have the same scale)**
+
+We expect the slope close be to -1.
+
+**ii) What is the correlation of x and y that you would generally expect?**
+
+If x and y are linear, we can expect the correlation be close to -1.
+
+If x and y are nonlinear, we can expect the correlation be close to 0.
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_d.png")
+```
+
+**e. Apart from any of the above scenarios, find another pattern of data points with no correlation (r ≈ 0).**
+
+We create a symmetric pattern.
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_e.png")
+```
+
+**f. Apart from any of the above scenarios, find another pattern of data points with perfect correlation (r ≈ 1).**
+
+We create a set of points highly centralized into a positive steep slope line (almost vertical line).
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_f.png")
+```
+
+**g. Let’s see how correlation relates to simple regression, by simulating any linear relationship you wish:**
+
+**i) Run the simulation and record the points you create: **
+
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("Q2_g.png")
+PTS<-read.csv("pts.csv")
+PTS
+```
+
+**ii) Use the lm() function to estimate the regression intercept and slope of pts to ensure they are the same as the values reported in the simulation plot: **
+```{r}
+summary(lm(PTS$y ~ PTS$x))
+
+```
+
+The intercept is the same as the plot(1.91).
+
+**iii) Estimate the correlation of x and y to see it is the same as reported in the plot:**
+```{r}
+cor(PTS)
+```
+
+The correlation of x and y is the same as reported in the plot(r = 0.99).
+
+**iv) Now, standardize the values of both x and y from pts and re-estimate the regression slope**
+```{r}
+X <- (PTS$x-mean(PTS$x))/sd(PTS$x)
+Y <- (PTS$y-mean(PTS$y))/sd(PTS$y)
+summary(lm(Y ~ X))
+```
+
+**v) What is the relationship between correlation and the standardized simple-regression estimates?**
+```{r}
+cor(X,Y)
+```
+
+The covariance of standardized simple-regression is equal to correlation (0.99).
+
+
+
+
+
+
+
